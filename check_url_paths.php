@@ -41,7 +41,7 @@ $trash = fopen("/dev/null", "w");
 
 # get the file that contains the list of urls
 if ( is_file($argv[1]) ) {
-	$paths = file($argv[1]);
+	$url_paths = file($argv[1]);
 } else {
 	echo "No such file: {$argv[1]}\n";
 	exit;
@@ -94,11 +94,11 @@ if ( isset($argv[4]) ) {
 	$parallels = 10;
 }
 
-$path_count = count($paths);
+$path_count = count($url_paths);
 
 echo <<<PARAMS
 URL path file: {$argv[1]}
-Number of paths: $path_count
+Number of URL paths: $path_count
 Host 1: $host1
 Host 2: $host2
 URLs to fetch in parallel: $parallels
@@ -113,18 +113,22 @@ $start_time = time();
 $h1_curls = array();
 $h2_curls = array();
 
-$i = 1;
+$i = 0;
 
-for ( $idx = 1; $idx <= count($paths); $idx++ ) {
+for ( $idx = 0; $idx < count($url_paths); $idx++ ) {
 
+	$url_path = trim($url_paths[$idx]);
+
+	# setup cURL for host 1
 	$h1_curls[$i] = curl_init();
-	curl_setopt($h1_curls[$i], CURLOPT_URL, "$host1{$paths[$idx]}");
+	curl_setopt($h1_curls[$i], CURLOPT_URL, "$host1{$url_path}");
 	curl_setopt($h1_curls[$i], CURLOPT_HEADER, 1);
 	curl_setopt($h1_curls[$i], CURLOPT_NOBODY, 1);
 	curl_setopt($h1_curls[$i], CURLOPT_FILE, $trash);
 
+	# setup cURL for host 2
 	$h2_curls[$i] = curl_init();
-	curl_setopt($h2_curls[$i], CURLOPT_URL, "$host2{$paths[$idx]}");
+	curl_setopt($h2_curls[$i], CURLOPT_URL, "$host2{$url_path}");
 	curl_setopt($h2_curls[$i], CURLOPT_HEADER, 1);
 	curl_setopt($h2_curls[$i], CURLOPT_NOBODY, 1);
 	curl_setopt($h2_curls[$i], CURLOPT_FILE, $trash);
@@ -132,13 +136,13 @@ for ( $idx = 1; $idx <= count($paths); $idx++ ) {
 	# after we have gathered $parallels number of URLs, then
 	# run through all of them with a curl multi object, also 
 	# run this if we have exhausted all the URLs
-	if ( ($idx % $parallels) == 0  || count($paths) == $idx ) {
+	if ( ($idx % $parallels) == 0 && $idx != 0 || count($url_paths) == $idx ) {
 		$mh_h1 = curl_multi_init();
 		$mh_h2 = curl_multi_init();
-		for ( $ih1 = 1; $ih1 <= count($h1_curls); $ih1++ ) {
+		for ( $ih1 = 0; $ih1 < count($h1_curls); $ih1++ ) {
 			curl_multi_add_handle($mh_h1, $h1_curls[$ih1]);
 		}
-		for ( $ih2 = 1; $ih2 <= count($h2_curls); $ih2++ ) {
+		for ( $ih2 = 0; $ih2 < count($h2_curls); $ih2++ ) {
 			curl_multi_add_handle($mh_h2, $h2_curls[$ih2]);
 		}
 
@@ -152,14 +156,17 @@ for ( $idx = 1; $idx <= count($paths); $idx++ ) {
 			curl_multi_exec($mh_h2, $running);
 		}
 
-		for ( $ii = 1; $ii <= count($h1_curls); $ii++ ) {
+		for ( $ii = 0; $ii < count($h1_curls); $ii++ ) {
 			$h1_code = curl_getinfo($h1_curls[$ii], CURLINFO_HTTP_CODE);
 			$h2_code = curl_getinfo($h2_curls[$ii], CURLINFO_HTTP_CODE);
 
 			if ( $h1_code != $h2_code ) {
 				$curr_url = curl_getinfo($h1_curls[$ii], CURLINFO_EFFECTIVE_URL);
-				$curr_path = ltrim($curr_url, "http://$host1");
-				$discrepancy = "DISCREPANCY for path '$curr_path' : host1 said $h1_code, but host 2 said $h2_code\n";
+				$url_parts = parse_url($curr_url);
+				$curr_path = $url_parts['path'];
+				$curr_path .= ( empty($url_parts['query']) ) ? "" : "?{$url_parts['query']}";
+				$curr_path .= ( empty($url_parts['fragment']) ) ? "" : "#{$url_parts['fragment']}";
+				$discrepancy = "DISCREPANCY for path '$curr_path' : host1 said $h1_code, but host 2 said $h2_code";
 				echo "DISCREPANCY for path '$curr_path' : host1 said $h1_code, but host 2 said $h2_code\n";
 				fwrite($diffs, "$discrepancy\n");
 			}
@@ -170,12 +177,12 @@ for ( $idx = 1; $idx <= count($paths); $idx++ ) {
 		}
 
 		# close the curl multi handle objects and reset curl object arrays.
-		# also set $i back to 1 for the next batch
+		# also set $i back to 0 for the next batch
 		$h1_curls = array();
 		$h2_curls = array();
 		curl_multi_close($mh_h1);
 		curl_multi_close($mh_h2);
-		$i = 1;
+		$i = 0;
 
 		$elapsed = time() - $start_time;
 		echo "$idx of $path_count URLs processed.  Seconds since start: $elapsed\n";
