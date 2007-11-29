@@ -8,6 +8,9 @@
  * URLs to their canonical form, so if there are any redirects in the path, the 
  * original URL will be replaced by the URL of the final redirect.
  *
+ * In addition to converting URLs to their canonical form, it will also exclude
+ * URLs whose final HTTP return code was anything other than 200.
+ *
  * Please not that this is not an exact science and that misconfigured web 
  * servers may not always redirect to something sensible, though the URL is 
  * guaranteed to be reacheable, it may not be what you expected.
@@ -82,6 +85,7 @@ for ( $idx = 0; $idx < count($urls); $idx++ ) {
 		} while ($running > 0);
 		
 		for ( $ic = 0; $ic < count($curls); $ic++ ) {
+			$return_code = curl_getinfo($curls[$ic], CURLINFO_HTTP_CODE);
 			$last_url = curl_getinfo($curls[$ic], CURLINFO_EFFECTIVE_URL);
 
 			# Check for errors
@@ -94,7 +98,9 @@ for ( $idx = 0; $idx < count($urls); $idx++ ) {
 			# If an error was found, then don't even bother getting
 			# the last URL because it's likely to be wrong anyway,
 			# and an error message was logged for this URL anyway.
-			if ( ! $err ) {
+			# And if no error, then only write this URL if the last
+			# return code was 200.
+			if ( ! $err  && $return_code == 200 ) {
 				fwrite($canonical_urls, "$last_url\n");
 			}
 
