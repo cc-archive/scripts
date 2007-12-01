@@ -64,7 +64,7 @@ $start_time = time();
 $i = 0;
 $curls = array();
 
-for ( $idx = 0; $idx < count($urls); $idx++ ) {
+for ( $idx = 0; $idx <= $url_count; $idx++ ) {
 
 	$url = trim($urls[$idx]);
 
@@ -72,7 +72,7 @@ for ( $idx = 0; $idx < count($urls); $idx++ ) {
 	# After $parallels number of URLs are gathered, then run through all of
 	# them with a curl_multi object, also enter this if we have already
 	# exhausted all the URLs
-	if ( ($idx % $parallels) == 0 && $idx != 0 || (count($urls) -1) == $idx ) {
+	if ( ($idx % $parallels) == 0 && $idx != 0 || $url_count == $idx ) {
 		$mh = curl_multi_init();
 		for ( $im = 0; $im < count($curls); $im++ ) {
 			curl_multi_add_handle($mh, $curls[$im]);
@@ -95,11 +95,32 @@ for ( $idx = 0; $idx < count($urls); $idx++ ) {
 				fwrite($canonical_urls, $msg);
 			}
 
+			# If it's a 404 return code, then we assume it's bad and
+			# print an error.
+			if ( $return_code == 404 ) {
+				$msg = "ERROR 404: $last_url\n";
+				echo "$msg";
+				fwrite($canonical_urls, $msg);
+			}
+
+			# And if the return code wasn't 404 or 200, then issue
+			# a warning. It might be most appropriate
+			# to exclude any URL that didn't return 200, but I've found
+			# that some servers will return a 403 or 405 error when
+			# accessed with cURL using this script, probably because
+			# it's only asking for HEAD and those servers refuse to 
+			# do that.  So, without making this script more complicated
+			# let's just issue a warning here.
+			if ( ($return_code != 404) && ($return_code != 200) ) {
+				$msg = "WARNING: $return_code HTTP return code : $last_url\n";
+				echo "$msg";
+				fwrite($canonical_urls, $msg);
+			}
+
 			# If an error was found, then don't even bother getting
 			# the last URL because it's likely to be wrong anyway,
 			# and an error message was logged for this URL anyway.
-			# And if no error, then only write this URL if the last
-			# return code was 200.
+			# But only do this if the return code was also 200.
 			if ( ! $err  && $return_code == 200 ) {
 				fwrite($canonical_urls, "$last_url\n");
 			}
@@ -122,8 +143,8 @@ for ( $idx = 0; $idx < count($urls); $idx++ ) {
 
 	}
 
-	# Add another cURL object to the $curls array and set the right options for 
-	# it
+	# Add another cURL object to the $curls array and set the
+	# right options for it
 	$curls[$i] = curl_init();
 	curl_setopt($curls[$i], CURLOPT_URL, "$url");
 	foreach ( $curl_options as $opt => $value ) {
