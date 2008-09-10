@@ -41,4 +41,4 @@ if len(contributions):
     for contribution in contributions:
         print contribution
 else:
-    return None
+    print "No contributions found."
