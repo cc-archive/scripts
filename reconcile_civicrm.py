@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import sys
-import logging
 import csv  # http://docs.python.org/lib/module-csv.html
 import sqlalchemy
 
@@ -18,42 +17,33 @@ else:
     exit()
 
 paypal_completed = csv.reader(open(csv_file))
+log_file = open('reconcile_civicrm.log', 'w')
 
 # setup database connectivity
 db = sqlalchemy.create_engine('mysql://root@localhost/civicrm', convert_unicode=True)
 metadata = sqlalchemy.MetaData(db)
 civicrm_contributions = sqlalchemy.Table('civicrm_contribution', metadata, autoload=True)
 
-# configure the logger.  see: http://docs.python.org/lib/module-logging.html
-logging.basicConfig(
-	format='%(levelname)-8s %(message)s',
-	filename='reconcile_civicrm.log',
-	filemode='w'
-)
-
 not_found = 0
 discrepancies = 0
 
+msg = 'Type,Contact ID,Name,Email,Invoice ID,Date,Amount,Transaction Type,Item Title\n'
+print msg
+log_file.write(msg)
+
 for record in paypal_completed:
+    msg = ''
     if record[31]:
         contribution = civicrm_contributions.select(civicrm_contributions.c.invoice_id == record[31]).execute().fetchone()
         if contribution:
+            msg = str(contribution.contact_id) + ',' + unicode(record[3], 'iso-8859-1') + ',' + record[10] + ',' + record[31] + ',' + record[0] + ',' + record[7] + ',' + record[4] + ',' + record[15] + '\n'
             if record[5] == "Completed" and contribution.contribution_status_id != 1:
-                msg = 'DISCREPANCY: ' + unicode(record[3], 'iso-8859-1') + ', invoice# ' + record[31] + ', ' + record[0]
                 print msg
-                logging.warning(msg)
+                log_file.write('discrepancy,' + msg)
                 discrepancies = discrepancies + 1
         else:
-            msg = 'NOT FOUND: ' + unicode(record[3], 'iso-8859-1') + ', invoice# ' + record[31] + ', ' + record[0]
             print msg
-            logging.warning(msg)
+            log_file.write('not found,' + msg)
             not_found = not_found + 1
 
-
-print '\n'
-msg = str(discrepancies) + " discrepancies."
-print msg
-logging.info(msg)
-msg = str(not_found) + " not found."
-print msg
-logging.info(msg)
+log_file.close()
