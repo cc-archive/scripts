@@ -42,6 +42,7 @@ for record in paypal_completed:
                 log_file.write('discrepancy,' + msg)
                 discrepancies = discrepancies + 1
         else:
+            msg = '?' + ',' + unicode(record[3], 'iso-8859-1') + ',' + record[10] + ',' + record[31] + ',' + record[0] + ',' + record[7] + ',' + record[4] + ',' + record[15] + '\n'
             print msg
             log_file.write('not found,' + msg)
             not_found = not_found + 1
