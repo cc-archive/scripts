@@ -27,7 +27,7 @@ civicrm_contributions = sqlalchemy.Table('civicrm_contribution', metadata, autol
 not_found = 0
 discrepancies = 0
 
-msg = 'Type,Contact ID,Name,Email,Invoice ID,Date,Amount,Transaction Type,Item Title\n'
+msg = 'Type,Contact ID,Name,Email,Invoice ID,Date,Amount,Transaction Type,Item Title,Transaction ID\n'
 print msg
 log_file.write(msg)
 
@@ -36,13 +36,13 @@ for record in paypal_completed:
     if record[31]:
         contribution = civicrm_contributions.select(civicrm_contributions.c.invoice_id == record[31]).execute().fetchone()
         if contribution:
-            msg = str(contribution.contact_id) + ',' + unicode(record[3], 'iso-8859-1') + ',' + record[10] + ',' + record[31] + ',' + record[0] + ',' + record[7] + ',' + record[4] + ',' + record[15] + '\n'
+            msg = str(contribution.contact_id) + ',' + unicode(record[3], 'iso-8859-1') + ',' + record[10] + ',' + record[31] + ',' + record[0] + ',' + record[7] + ',' + record[4] + ',' + record[15] + ',' + record[12] + '\n'
             if record[5] == "Completed" and contribution.contribution_status_id != 1:
                 print msg
                 log_file.write('discrepancy,' + msg)
                 discrepancies = discrepancies + 1
         else:
-            msg = '?' + ',' + unicode(record[3], 'iso-8859-1') + ',' + record[10] + ',' + record[31] + ',' + record[0] + ',' + record[7] + ',' + record[4] + ',' + record[15] + '\n'
+            msg = '?' + ',' + unicode(record[3], 'iso-8859-1') + ',' + record[10] + ',' + record[31] + ',' + record[0] + ',' + record[7] + ',' + record[4] + ',' + record[12] + '\n'
             print msg
             log_file.write('not found,' + msg)
             not_found = not_found + 1
